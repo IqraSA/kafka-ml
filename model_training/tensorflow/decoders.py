@@ -55,13 +55,7 @@ class AvroDecoder:
     def decode(self, x, y):
         decode_x = tfio.experimental.serialization.decode_avro(x, schema=self.data_scheme)
         decode_y = tfio.experimental.serialization.decode_avro(y, schema=self.label_scheme)
-      
-        res_x= []
-        for key in decode_x.keys():
-            res_x.append(decode_x.get(key))
-        
-        res_y = []
-        for key in decode_y.keys():
-            res_y.append(decode_y.get(key))
 
+        res_x = [decode_x.get(key) for key in decode_x.keys()]
+        res_y = [decode_y.get(key) for key in decode_y.keys()]
         return (res_x, res_y)

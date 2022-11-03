@@ -28,7 +28,7 @@ class RawDecoder:
     def __init__(self, configuration):
         self.datatype = configuration['data_type']
         self.reshape = configuration['data_reshape']
-        if self.reshape != None and self.reshape != '':
+        if self.reshape not in [None, '']:
             self.reshape = np.fromstring(self.reshape, dtype=int, sep=' ')
     
     def decode(self, msg):
@@ -46,20 +46,14 @@ class AvroDecoder:
         self.data_scheme = str(configuration['data_scheme']).replace("'", '"')
 
     # Decode messages
-    def avro_decoder(msg_value, reader):
-        message_bytes = io.BytesIO(msg_value)
+    def avro_decoder(self, reader):
+        message_bytes = io.BytesIO(self)
         decoder = BinaryDecoder(message_bytes)
-        event_dict = reader.read(decoder)
-        return event_dict
+        return reader.read(decoder)
     
     def decode(self, x, y):
         reader_x = DatumReader(self.data_scheme)
 
         decode_x = self.avro_decoder(x, reader_x)
-      
-        res= []
-        for key in decode_x.keys():
-            res.append(decode_x.get(key))
-        
 
-        return res
+        return [decode_x.get(key) for key in decode_x.keys()]

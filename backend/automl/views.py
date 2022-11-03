@@ -51,11 +51,10 @@ def kubernetes_config( token=None, external_host=None ):
     if token != None and \
         external_host != None:
 
-        aConfiguration.host = external_host 
+        aConfiguration.host = external_host
         aConfiguration.verify_ssl = False
-        aConfiguration.api_key = { "authorization": "Bearer " + token }
-    api_client = client.ApiClient( aConfiguration) 
-    return api_client
+        aConfiguration.api_key = {"authorization": f"Bearer {token}"}
+    return client.ApiClient( aConfiguration)
 
 def parse_kwargs_fit(kwargs_fit):
     """Converts kwargs_fit to a dictionary string
@@ -66,12 +65,12 @@ def parse_kwargs_fit(kwargs_fit):
             str: kwargs_fit formatted as string JSON
     """
     dic = {}
-    if kwargs_fit != None and kwargs_fit != '':
+    if kwargs_fit not in [None, '']:
         kwargs_fit=kwargs_fit.replace(" ", "")
         for l in kwargs_fit.split(","):
             pair=l.split('=')
             dic[pair[0]]=eval(pair[1])
-    
+
     return json.dumps(dic)
 
 def delete_deploy( inference_id, token=None, external_host=None ):
@@ -90,13 +89,13 @@ def delete_deploy( inference_id, token=None, external_host=None ):
     """
     api_client = kubernetes_config( token=token, external_host=external_host )
     api_instance = client.CoreV1Api( api_client )
-    api_response = api_instance.delete_namespaced_replication_controller(
-        name='model-inference-'+str( inference_id ),
+    return api_instance.delete_namespaced_replication_controller(
+        name=f'model-inference-{str(inference_id)}',
         namespace=settings.KUBE_NAMESPACE,
         body=client.V1DeleteOptions(
-            propagation_policy='Foreground',
-            grace_period_seconds=5))
-    return api_response
+            propagation_policy='Foreground', grace_period_seconds=5
+        ),
+    )
 
 class ModelList(generics.ListCreateAPIView):
     """View to get the list of models and create a new model
@@ -141,11 +140,19 @@ class ModelList(generics.ListCreateAPIView):
                 data_to_send = {"imports_code": imports_code, "model_code": data['code'], "distributed": data['distributed'], "request_type": "check"}
             else:             
                 data_to_send = {"imports_code": imports_code, "model_code": data['code'], "distributed": False, "request_type": "check"}
-                                     
+
             if data['framework'] == "pth":
-                resp = requests.post(settings.PYTORCH_EXECUTOR_URL+"exec_pth/",data=json.dumps(data_to_send))
+                resp = requests.post(
+                    f"{settings.PYTORCH_EXECUTOR_URL}exec_pth/",
+                    data=json.dumps(data_to_send),
+                )
+
             else:   
-                resp = requests.post(settings.TENSORFLOW_EXECUTOR_URL+"exec_tf/",data=json.dumps(data_to_send))
+                resp = requests.post(
+                    f"{settings.TENSORFLOW_EXECUTOR_URL}exec_tf/",
+                    data=json.dumps(data_to_send),
+                )
+
 
             """Prints the information of the model"""
             if resp.status_code == 200:
@@ -198,27 +205,45 @@ class ModelID(generics.RetrieveUpdateDestroyAPIView):
                 data = json.loads(request.body)
                 model_obj = MLModel.objects.get(pk=pk)
                 serializer = MLModelSerializer(model_obj, data=data)
-                if serializer.is_valid():
-                    if data['code'] != model_obj.code or data['framework'] != model_obj.framework:
-                        imports_code = '' if 'imports' not in data else data['imports']
-                        
-                        if 'distributed' in data:
-                            data_to_send = {"imports_code": imports_code, "model_code": data['code'], "distributed": data['distributed'], "request_type": "check"}
-                        else:
-                            data_to_send = {"imports_code": imports_code, "model_code": data['code'], "distributed": False, "request_type": "check"}
-                            
-                        if data['framework'] == "pth":
-                            resp = requests.post(settings.PYTORCH_EXECUTOR_URL+"exec_pth/",data=json.dumps(data_to_send))
-                        else:   
-                            resp = requests.post(settings.TENSORFLOW_EXECUTOR_URL+"exec_tf/",data=json.dumps(data_to_send))
-
-                        """Prints the information of the model"""
-                        if resp.status_code != 200:
-                            return HttpResponse('Model not valid.', status=status.HTTP_400_BAD_REQUEST)
-                    serializer.save()
-                    return HttpResponse(status=status.HTTP_200_OK)
-                else:
+                if not serializer.is_valid():
                     return HttpResponse("Information not valid", status=status.HTTP_400_BAD_REQUEST)
+                if data['code'] != model_obj.code or data['framework'] != model_obj.framework:
+                    imports_code = '' if 'imports' not in data else data['imports']
+
+                    data_to_send = (
+                        {
+                            "imports_code": imports_code,
+                            "model_code": data['code'],
+                            "distributed": data['distributed'],
+                            "request_type": "check",
+                        }
+                        if 'distributed' in data
+                        else {
+                            "imports_code": imports_code,
+                            "model_code": data['code'],
+                            "distributed": False,
+                            "request_type": "check",
+                        }
+                    )
+
+                    if data['framework'] == "pth":
+                        resp = requests.post(
+                            f"{settings.PYTORCH_EXECUTOR_URL}exec_pth/",
+                            data=json.dumps(data_to_send),
+                        )
+
+                    else:   
+                        resp = requests.post(
+                            f"{settings.TENSORFLOW_EXECUTOR_URL}exec_tf/",
+                            data=json.dumps(data_to_send),
+                        )
+
+
+                    """Prints the information of the model"""
+                    if resp.status_code != 200:
+                        return HttpResponse('Model not valid.', status=status.HTTP_400_BAD_REQUEST)
+                serializer.save()
+                return HttpResponse(status=status.HTTP_200_OK)
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logging.error(str(e))
@@ -246,14 +271,12 @@ class ModelResultID(generics.RetrieveAPIView):
     """
 
     def get(self, request, pk, format=None):
-        if TrainingResult.objects.filter(pk=pk).exists():
-            result = TrainingResult.objects.get(pk=pk)
-            model = result.model
-            serializer = MLModelSerializer(model, many=False)
-            return HttpResponse(json.dumps(serializer.data), status=status.HTTP_200_OK)
-        else:
+        if not TrainingResult.objects.filter(pk=pk).exists():
             return HttpResponse('TrainingResult not found', status=status.HTTP_400_BAD_REQUEST)
-        return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        result = TrainingResult.objects.get(pk=pk)
+        model = result.model
+        serializer = MLModelSerializer(model, many=False)
+        return HttpResponse(json.dumps(serializer.data), status=status.HTTP_200_OK)
 
 class ConfigurationList(generics.ListCreateAPIView):
     """View to get the list of configurations and create a new configuration
@@ -276,10 +299,7 @@ class ConfigurationList(generics.ListCreateAPIView):
                     son = obj.child
                     while son:
                         all_models.append(son.id)
-                        if hasattr(son, 'child'):
-                            son = son.child
-                        else:
-                            son = None
+                        son = son.child if hasattr(son, 'child') else None
             data['ml_models'] = all_models
             serializer = ConfigurationSerializer(data=data)
             if serializer.is_valid():
@@ -302,31 +322,27 @@ class ConfigurationID(generics.RetrieveUpdateDestroyAPIView):
     def put(self, request, pk, format=None):
         """Obteins all the models from a configuration"""
         try:
-            if Configuration.objects.filter(pk=pk).exists():
-                data = json.loads(request.body)
-                models = data['ml_models']
-                all_models = []
-                for m in models:
-                    all_models.append(m)
-                    obj = MLModel.objects.get(pk=m)
-                    if hasattr(obj, 'child'):
-                        son = obj.child
-                        while son:
-                            all_models.append(son.id)
-                            if hasattr(son, 'child'):
-                                son = son.child
-                            else:
-                                son = None
-                data['ml_models'] = all_models
-                configuration_obj = Configuration.objects.get(pk=pk)
-                serializer = ConfigurationSerializer(configuration_obj, data=data)
-                if serializer.is_valid():
-                    serializer.save()
-                    return HttpResponse(status=status.HTTP_200_OK)
-                else:
-                    return HttpResponse("Information not valid", status=status.HTTP_400_BAD_REQUEST)
-            else:
+            if not Configuration.objects.filter(pk=pk).exists():
                 return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+            data = json.loads(request.body)
+            models = data['ml_models']
+            all_models = []
+            for m in models:
+                all_models.append(m)
+                obj = MLModel.objects.get(pk=m)
+                if hasattr(obj, 'child'):
+                    son = obj.child
+                    while son:
+                        all_models.append(son.id)
+                        son = son.child if hasattr(son, 'child') else None
+            data['ml_models'] = all_models
+            configuration_obj = Configuration.objects.get(pk=pk)
+            serializer = ConfigurationSerializer(configuration_obj, data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return HttpResponse(status=status.HTTP_200_OK)
+            else:
+                return HttpResponse("Information not valid", status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logging.error(str(e))
             return HttpResponse('Information not valid', status=status.HTTP_400_BAD_REQUEST)
@@ -356,10 +372,7 @@ class ConfigurationUsedFrameworks(generics.GenericAPIView):
         try:
             if Configuration.objects.filter(pk=pk).exists():
                 obj = Configuration.objects.get(pk=pk)
-                frameworks_used = set()
-
-                for x in obj.ml_models.all():
-                    frameworks_used.add(x.framework)
+                frameworks_used = {x.framework for x in obj.ml_models.all()}
 
                 return HttpResponse(json.dumps(list(frameworks_used)), status=status.HTTP_200_OK)
             return HttpResponse('Configuration does not exist', status=status.HTTP_400_BAD_REQUEST)
@@ -377,12 +390,7 @@ class DistributedConfiguration(generics.GenericAPIView):
         try:
             if Configuration.objects.filter(pk=pk).exists():
                 obj = Configuration.objects.get(pk=pk)
-                resp = False
-
-                for m in obj.ml_models.all():
-                    if m.distributed:
-                        resp = True
-
+                resp = any(m.distributed for m in obj.ml_models.all())
                 return HttpResponse(json.dumps(resp), status=status.HTTP_200_OK)
             return HttpResponse('Configuration does not exists', status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:

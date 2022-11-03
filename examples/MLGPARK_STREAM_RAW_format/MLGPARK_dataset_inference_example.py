@@ -32,9 +32,7 @@ for x in data['result']['records']:
 		date = datetime.datetime.now(datetime.timezone.utc).strftime("%d %m %Y %H %M").split(' ')
 	else:
 		date = datetime.datetime.strptime(x['fechahora_ultima_actualizacion'], '%Y-%m-%d %H:%M:%S UTC').strftime("%d %m %Y %H %M").split(' ')
-		pass
-	
-	input_data += [np.int64(i) for i in date]  
+	input_data += [np.int64(i) for i in date]
 	input_data = np.array(input_data)
 
 	# Send data

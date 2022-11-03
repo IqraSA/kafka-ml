@@ -1,5 +1,5 @@
 import sys
-sys.path.append(sys.path[0] + "/../..") 
+sys.path.append(f"{sys.path[0]}/../..")
 """To allow importing datasources"""
 
 from datasources.online_raw_sink import OnlineRawSink

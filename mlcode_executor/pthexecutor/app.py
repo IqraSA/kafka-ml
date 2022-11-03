@@ -80,6 +80,9 @@ def get_sample_data(batch):
     return train_dataloader, test_dataloader
 
 def get_sample_model():
+
+
+
     class SampleNeuralNetwork(nn.Module):
         def __init__(self):
             super(SampleNeuralNetwork, self).__init__()
@@ -90,8 +93,7 @@ def get_sample_model():
             )
 
         def forward(self, x):
-            logits = self.samplelayer(x)
-            return logits
+            return self.samplelayer(x)
 
         def loss_fn(self):
             return nn.MSELoss()
@@ -100,50 +102,46 @@ def get_sample_model():
             return torch.optim.RMSprop(tf_executor_sample_model.parameters())
 
         def metrics(self):
-            val_metrics = {
-                "loss": Loss(self.loss_fn())
-            }
-            return val_metrics
+            return {"loss": Loss(self.loss_fn())}
 
-    tf_executor_sample_model = SampleNeuralNetwork()
 
-    return tf_executor_sample_model
+    return SampleNeuralNetwork()
 
 def split_fit_params(fn_kwargs_fit: dict):
-  fit_dataloader_list = ["shuffle", "sampler", "batch_sampler", "num_workers", "collate_fn", "pin_memory", "drop_last", "timeout",
-                         "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]  
-  trainer_list = ["non_blocking", "prepare_batch", "output_transform", "deterministic", "amp_mode", "scaler", "gradient_accumulation_steps"]
-  fit_run_list = ["max_epochs", "epoch_length"]
+    fit_dataloader_list = ["shuffle", "sampler", "batch_sampler", "num_workers", "collate_fn", "pin_memory", "drop_last", "timeout",
+                           "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]
+    trainer_list = ["non_blocking", "prepare_batch", "output_transform", "deterministic", "amp_mode", "scaler", "gradient_accumulation_steps"]
+    fit_run_list = ["max_epochs", "epoch_length"]
 
-  fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs = dict(), dict(), dict()
+    fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs = {}, {}, {}
 
-  for args in list(fn_kwargs_fit.keys()):
-    if args in fit_dataloader_list:
-      fit_dataloader_kwargs[args]=fn_kwargs_fit[args]
-    elif args in trainer_list:
-      trainer_kwargs[args]=fn_kwargs_fit[args]
-    elif args in fit_run_list:
-      fit_run_kwargs[args]=fn_kwargs_fit[args]  
-  
-  return fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs
+    for args in list(fn_kwargs_fit.keys()):
+      if args in fit_dataloader_list:
+        fit_dataloader_kwargs[args]=fn_kwargs_fit[args]
+      elif args in trainer_list:
+        trainer_kwargs[args]=fn_kwargs_fit[args]
+      elif args in fit_run_list:
+        fit_run_kwargs[args]=fn_kwargs_fit[args]  
+
+    return fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs
 
 def split_val_params(fn_kwargs_val: dict):
-  val_dataloader_list = ["shuffle", "sampler", "batch_sampler", "num_workers", "collate_fn", "pin_memory", "drop_last", "timeout",
-                         "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]  
-  validator_list = ["non_blocking", "prepare_batch", "output_transform", "amp_mode"]
-  val_run_list = ["max_epochs", "epoch_length"]
+    val_dataloader_list = ["shuffle", "sampler", "batch_sampler", "num_workers", "collate_fn", "pin_memory", "drop_last", "timeout",
+                           "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]
+    validator_list = ["non_blocking", "prepare_batch", "output_transform", "amp_mode"]
+    val_run_list = ["max_epochs", "epoch_length"]
 
-  val_dataloader_kwargs, validator_kwargs, val_run_kwargs = dict(), dict(), dict()
+    val_dataloader_kwargs, validator_kwargs, val_run_kwargs = {}, {}, {}
 
-  for args in list(fn_kwargs_val.keys()):
-    if args in val_dataloader_list:
-      val_dataloader_kwargs[args]=fn_kwargs_val[args]
-    elif args in validator_list:
-      validator_kwargs[args]=fn_kwargs_val[args]
-    elif args in val_run_list:
-      val_run_kwargs[args]=fn_kwargs_val[args]  
-  
-  return val_dataloader_kwargs, validator_kwargs, val_run_kwargs
+    for args in list(fn_kwargs_val.keys()):
+      if args in val_dataloader_list:
+        val_dataloader_kwargs[args]=fn_kwargs_val[args]
+      elif args in validator_list:
+        validator_kwargs[args]=fn_kwargs_val[args]
+      elif args in val_run_list:
+        val_run_kwargs[args]=fn_kwargs_val[args]  
+
+    return val_dataloader_kwargs, validator_kwargs, val_run_kwargs
 
 
 @app.route('/check_deploy_config/', methods=['POST'])

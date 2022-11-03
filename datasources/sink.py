@@ -94,7 +94,7 @@ class KafkaMLSink(object):
             
     def __get_partitions_and_offsets(self):
         """Obtains the partitions and offsets in the topic defined"""
-        
+
         dic = {} 
         partitions = self.__consumer.partitions_for_topic(self.topic)
         if partitions is not None:
@@ -133,15 +133,14 @@ class KafkaMLSink(object):
         res = ""
         for p in self.__partitions.keys():
             """ Format topic:partition:offset:length,topic1:partition:offset:length"""
-            res+= self.topic +":"+ str(p)+ ":" + str(self.__partitions[p]['offset'])
+            res += f"{self.topic}:{str(p)}:" + str(self.__partitions[p]['offset'])
             if 'length' in self.__partitions[p]:
                 res += ":" + str(self.__partitions[p]['length'])
             res+=","
-        
-        res = res[:-1]
+
         """Remove last ',' list of topics"""
 
-        return res
+        return res[:-1]
 
     def __send_control_msg(self):
         """Sends control message to Apache Kafka with the information"""

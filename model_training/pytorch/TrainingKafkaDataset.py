@@ -12,14 +12,14 @@ class TrainingKafkaDataset(Dataset):
         self.transform = transform
         self.label_transform = label_transform
         self.data = []
-        
+
         for kafkaControl in self.__splitPartitionsIntoControlMsgs__(controlMessage):
             consumer, end_offset = self.__createconsumer__(kafkaControl, bootstrap_servers, group_id)
 
             for message in consumer:
                 decoded_data = self.__decodedata__(message, controlMessage)
                 self.data.append(decoded_data)     
-                
+
                 if message.offset >= end_offset-1:
                     consumer.unsubscribe()
                     break
@@ -32,7 +32,7 @@ class TrainingKafkaDataset(Dataset):
             auxControlMSG = controlMsg.copy()
             auxControlMSG['topic'] = topic
             res.append(auxControlMSG)
-        
+
         return res
 
     def __createconsumer__(self, controlMessage, bootstrap_servers, group_id):
@@ -48,30 +48,15 @@ class TrainingKafkaDataset(Dataset):
 
         return consumer, end_offset
 
-    def __avro_decoder__(msg_value, reader):
-        message_bytes = io.BytesIO(msg_value)
+    def __avro_decoder__(self, reader):
+        message_bytes = io.BytesIO(self)
         decoder = BinaryDecoder(message_bytes)
-        event_dict = reader.read(decoder)
-        return event_dict
+        return reader.read(decoder)
 
     def __decodedata__(self, input, controlMessage):
         input_format = controlMessage["input_format"]
         input_config = controlMessage['input_config']
-        if input_format == 'RAW':        
-            # Data decoding
-            value = np.copy(np.frombuffer(input.value, dtype=input_config['data_type']))
-            if input_config['data_reshape'] != None and input_config['data_reshape'] != '':
-                value.shape = np.fromstring(input_config['data_reshape'], dtype=int, sep=' ')
-
-            # Label decoding                                            
-            label = np.copy(np.frombuffer(input.key, dtype=input_config['label_type']))
-
-            if len(label) == 1:
-                label = label[0]
-            elif input_config['label_reshape'] != None and input_config['label_reshape'] != '':
-                value.shape = np.fromstring(input_config['data_reshape'], dtype=int, sep=' ')
-                
-        elif input_format == 'AVRO':
+        if input_format == 'AVRO':
             data_scheme = str(input_config['data_scheme']).replace("'", '"')
             label_scheme = str(input_config['label_scheme']).replace("'", '"')
 
@@ -80,15 +65,23 @@ class TrainingKafkaDataset(Dataset):
 
             decode_x = self.avro_decoder(input.value, reader_x)
             decode_y = self.avro_decoder(input.key, reader_y)
-        
-            res_x= []
-            for key in decode_x.keys():
-                res_x.append(decode_x.get(key))
-            
-            res_y = []
-            for key in decode_y.keys():
-                res_y.append(decode_y.get(key))
-           
+
+            res_x = [decode_x.get(key) for key in decode_x.keys()]
+            res_y = [decode_y.get(key) for key in decode_y.keys()]
+        elif input_format == 'RAW':
+            # Data decoding
+            value = np.copy(np.frombuffer(input.value, dtype=input_config['data_type']))
+            if input_config['data_reshape'] not in [None, '']:
+                value.shape = np.fromstring(input_config['data_reshape'], dtype=int, sep=' ')
+
+            # Label decoding                                            
+            label = np.copy(np.frombuffer(input.key, dtype=input_config['label_type']))
+
+            if len(label) == 1:
+                label = label[0]
+            elif input_config['label_reshape'] not in [None, '']:
+                value.shape = np.fromstring(input_config['data_reshape'], dtype=int, sep=' ')
+
         return (value, label)
 
     

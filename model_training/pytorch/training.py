@@ -56,14 +56,14 @@ def select_gpu():
   try:
     _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
     memory_free_info = _output_to_list(sp.check_output(COMMAND.split()))[1:]
-    memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-    
+    memory_free_values = [int(x.split()[0]) for x in memory_free_info]
+
     available_gpus = [i for i, x in enumerate(memory_free_values) if x > ACCEPTABLE_AVAILABLE_MEMORY]
     print("Available GPUs:", available_gpus)
     if len(available_gpus) > 1:
         available_gpus = [memory_free_values.index(max(memory_free_values))]
         print("Using GPU:", available_gpus)
-        
+
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, available_gpus))
   except Exception as e:
     print('"nvidia-smi" is probably not installed. GPUs are not masked.', e)
@@ -106,17 +106,15 @@ def get_train_data(boostrap_servers, kafka_topic, group, transform=None):
       train_data: training data and labels from Kafka
   """
   logging.info("Starts receiving training data from Kafka servers [%s] with topics [%s]", boostrap_servers,  kafka_topic)
-  train_data = TrainingKafkaDataset(kafka_topic, boostrap_servers, group, transform)                              
-  
-  return train_data
+  return TrainingKafkaDataset(kafka_topic, boostrap_servers, group, transform)
 
 def split_fit_params(fn_kwargs_fit: dict):
   fit_dataloader_list = ["shuffle", "sampler", "batch_sampler", "num_workers", "collate_fn", "pin_memory", "drop_last", "timeout",
-                         "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]  
+                         "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]
   trainer_list = ["non_blocking", "prepare_batch", "deterministic", "amp_mode", "scaler", "gradient_accumulation_steps"] # "output_transform"
   fit_run_list = ["max_epochs", "epoch_length"]
 
-  fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs = dict(), dict(), dict()
+  fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs = {}, {}, {}
 
   for args in list(fn_kwargs_fit.keys()):
     if args in fit_dataloader_list:
@@ -125,16 +123,16 @@ def split_fit_params(fn_kwargs_fit: dict):
       trainer_kwargs[args]=fn_kwargs_fit[args]
     elif args in fit_run_list:
       fit_run_kwargs[args]=fn_kwargs_fit[args]  
-  
+
   return fit_dataloader_kwargs, trainer_kwargs, fit_run_kwargs
 
 def split_val_params(fn_kwargs_val: dict):
   val_dataloader_list = ["shuffle", "sampler", "batch_sampler", "num_workers", "collate_fn", "pin_memory", "drop_last", "timeout",
-                         "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]  
+                         "worker_init_fn", "multiprocessing_context", "generator", "prefetch_factor", "persistent_workers"]
   validator_list = ["non_blocking", "prepare_batch", "amp_mode"] # "output_transform"
   val_run_list = ["max_epochs", "epoch_length"]
 
-  val_dataloader_kwargs, validator_kwargs, val_run_kwargs = dict(), dict(), dict()
+  val_dataloader_kwargs, validator_kwargs, val_run_kwargs = {}, {}, {}
 
   for args in list(fn_kwargs_val.keys()):
     if args in val_dataloader_list:
@@ -143,7 +141,7 @@ def split_val_params(fn_kwargs_val: dict):
       validator_kwargs[args]=fn_kwargs_val[args]
     elif args in val_run_list:
       val_run_kwargs[args]=fn_kwargs_val[args]  
-  
+
   return val_dataloader_kwargs, validator_kwargs, val_run_kwargs
 
 def custom_output_transform(x, y, y_pred, loss):

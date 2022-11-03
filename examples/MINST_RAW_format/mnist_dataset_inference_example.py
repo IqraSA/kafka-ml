@@ -14,7 +14,7 @@ print("Datasize minst: ", x_test.shape)
 
 producer = KafkaProducer(bootstrap_servers=BOOTSTRAP_SERVERS)
 """Creates a producer to send the values to predict"""
-for i in range (0, ITEMS_TO_PREDICT):
+for i in range(ITEMS_TO_PREDICT):
   producer.send(INPUT_TOPIC, x_test[i].tobytes())
   """Sends the value to predict to Kafka"""
 producer.flush()

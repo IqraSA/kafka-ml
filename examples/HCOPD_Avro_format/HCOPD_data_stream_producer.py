@@ -28,7 +28,7 @@ hcopd = AvroSink(boostrap_servers='127.0.0.1:9094', topic='hcopd', deployment_id
         data_scheme_filename='data_scheme.avsc', label_scheme_filename='label_scheme.avsc',
         description='COPD dataset', validation_rate=0.1, test_rate=0.1)
 
-for i in range (0, copd_data.shape[0]):
+for i in range(copd_data.shape[0]):
     data  = {"gender": features[0][i], "age": features[1][i], "smoking": features[2][i]}
     label = {"diagnosis": bool(diagnosis[i])}
     hcopd.send_avro(data, label)
