@@ -46,10 +46,6 @@ class AvroDecoder:
     
     def decode(self, msg):
         decode_x = tfio.experimental.serialization.decode_avro(msg, schema=self.data_scheme)
-      
-        res= []
-        for key in decode_x.keys():
-            res.append(decode_x.get(key))
-        
-        return res
+
+        return [decode_x.get(key) for key in decode_x.keys()]
     

@@ -41,9 +41,9 @@ class KafkaThread (threading.Thread):
                 if msg is None: # No message
                     continue
                 if msg.error(): # Error Message
-                    logging.error("Consumer error: {}".format(msg.error()))
+                    logging.error(f"Consumer error: {msg.error()}")
                     continue
-                
+
                 if self.isClassification:
                     self.ws.send(text_data=str(self.__argmax(
                         json.loads(msg.value().decode())['values']
@@ -52,7 +52,6 @@ class KafkaThread (threading.Thread):
                     self.ws.send(text_data=msg.value().decode())
             except Exception as e: 
                 logging.error(str(e))
-                pass
         self.kafka_consumer.close()
         
     def end(self):
@@ -62,7 +61,6 @@ class KafkaThread (threading.Thread):
             logging.info("Client successfully stopped")
         except Exception as e: 
             logging.error(str(e))
-            pass
 
 class KafkaWSConsumer(WebsocketConsumer):
     """ 
@@ -90,7 +88,7 @@ class KafkaWSConsumer(WebsocketConsumer):
         jsonData = json.loads(event["text"])
         topic = jsonData['topic']
         isClassification = jsonData['classification']
-        logging.info("Kafka consumer created for visualization in topic "+topic)
+        logging.info(f"Kafka consumer created for visualization in topic {topic}")
         thread= KafkaThread(topic, isClassification, settings.BOOTSTRAP_SERVERS, self)
         self.subscribers[self.channel_name] = thread
         thread.start()

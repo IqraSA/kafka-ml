@@ -45,11 +45,11 @@ if __name__ == '__main__':
 
     logging.info("Received environment information (bootstrap_servers, backend, control_topic, control_topic) ([%s], [%s], [%s])", 
               bootstrap_servers, backend, control_topic)
-    
+
     consumer = KafkaConsumer(control_topic, enable_auto_commit=False, bootstrap_servers=bootstrap_servers, group_id='logger')
     """Starts a Kafka consumer to receive the datasource information from the control topic"""
-    
-    url = 'http://'+backend+'/datasources/' 
+
+    url = f'http://{backend}/datasources/'
     logging.info("Created and connected Kafka consumer for control topic")
 
     for msg in consumer:
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         try:
           deployment_id = int.from_bytes(msg.key, byteorder='big')
           """Whether the deployment ID received matches the received in this task, then it is a datasource for this task."""
-            
+
           data = json.loads(msg.value)
           """ Data received from Kafka control topic. Data is a JSON with this format:
               dic={
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                   'description': ..,
               }
           """
-          
+
           retry = 0
           data['deployment'] = str(deployment_id)
           data['input_config'] = json.dumps(data['input_config'])
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
               consumer.commit()
               """commit the offset to Kafka after sending the data to the backend"""
-            
+
             except Exception as e:
               retry+=1
               time.sleep(SLEEP_BETWEEN_REQUESTS)

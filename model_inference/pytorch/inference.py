@@ -86,16 +86,16 @@ if __name__ == '__main__':
 
     input_bootstrap_servers, output_bootstrap_servers, model_code, model_weights, input_format, input_config, input_topic, output_topic, group_id = load_environment_vars()
     """Loads the environment information"""
-    
+
     input_config = json.loads(input_config)
     """Parse the configuration"""
 
     logging.info("Received environment information (input_bootstrap_servers, output_bootstrap_servers, model_url, input_format, input_config, input_topic, output_topic, group_id) ([%s], [%s], [%s], [%s], [%s], [%s], [%s], [%s], [%s])", 
                 input_bootstrap_servers, output_bootstrap_servers, model_code, model_weights, input_format, str(input_config), input_topic, output_topic, group_id)
-    
+
     model = download_model(model_code, RETRIES, SLEEP_BETWEEN_REQUESTS)
     """Downloads the model from the URL received to a PyTorch model (not trained)"""
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model.to(device)
@@ -107,16 +107,16 @@ if __name__ == '__main__':
     """Loads the trained model weights to the downloaded model"""
 
     model.eval()
-        
+
     consumer = Consumer({'bootstrap.servers': input_bootstrap_servers,'group.id': 'group_id','auto.offset.reset': 'earliest','enable.auto.commit': False})
-    consumer.subscribe([input_topic])    
+    consumer.subscribe([input_topic])
     """Starts a Kafka consumer to receive the information to predict"""
-    
+
     logging.info("Started Kafka consumer in [%s] topic", input_topic)
 
     output_producer = Producer({'bootstrap.servers': output_bootstrap_servers})
     """Starts a Kafka producer to send the predictions to the output"""
-    
+
     logging.info("Started Kafka producer in [%s] topic", output_topic)
 
     decoder = DecoderFactory.get_decoder(input_format, input_config)
@@ -131,8 +131,8 @@ if __name__ == '__main__':
       if msg is None:
           continue
       if msg.error():
-          print("Consumer error: {}".format(msg.error()))
-          continue
+        print(f"Consumer error: {msg.error()}")
+        continue
 
       try:
         start_inference = time.time()
@@ -145,16 +145,16 @@ if __name__ == '__main__':
         if input_decoded.shape[0] == 1 and len(input_decoded.shape) == 4:
           input_decoded = input_decoded[0]
         """Outwrapping the input data"""
-  
+
         tensored_input = ToTensor()(input_decoded)
-        
+
         tensored_input = torch.unsqueeze(tensored_input, 0)
 
         tensored_input = tensored_input.to(device)
 
         prediction_output = model(tensored_input)
         """Predicts the data received"""
-        
+
         print(prediction_output) if DEBUG else None
 
         prediction_value = prediction_output.tolist()[0]
@@ -170,14 +170,14 @@ if __name__ == '__main__':
         response_to_kafka = json.dumps(response).encode()
         """Encodes the object response"""
 
-  
+
         output_producer.produce(output_topic, response_to_kafka)
         output_producer.flush()
         """Flush the message to be sent now"""
         """Sends the message to Kafka"""
 
         logging.debug("Prediction sent to Kafka")
-        
+
         commitedMessages += 1
         if commitedMessages >= MAX_MESSAGES_TO_COMMIT:          
           consumer.commit()

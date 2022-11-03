@@ -22,11 +22,11 @@ def download_model(model_url, retries, sleep_time):
   retry = 0
   while not finished and retry < retries:
     try:
-      
+
       datatowrite = requests.get(model_url).content.decode("utf-8")
-            
+
       print(datatowrite)
-          
+
       exec(datatowrite, None, globals())
 
       if DEBUG:

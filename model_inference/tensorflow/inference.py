@@ -72,17 +72,15 @@ if __name__ == '__main__':
 
     input_bootstrap_servers, output_bootstrap_servers, model_url, input_format, input_config, input_topic, output_topic, group_id = load_environment_vars()
     """Loads the environment information"""
-    
+
     upper_bootstrap_servers = os.environ.get('UPPER_BOOTSTRAP_SERVERS')
     output_upper = os.environ.get('OUTPUT_UPPER')
     if upper_bootstrap_servers is not None and output_upper is not None:
       limit = eval(os.environ.get('LIMIT'))
     """Loads the distributed environment information"""
 
-    if upper_bootstrap_servers is not None and output_upper is not None and limit is not None:
-      distributed = True
-    else:
-      distributed = False
+    distributed = (upper_bootstrap_servers is not None
+                   and output_upper is not None and limit is not None)
     """Flag to work with distributed models"""
 
     input_config = json.loads(input_config)
@@ -94,31 +92,31 @@ if __name__ == '__main__':
     else:
       logging.info("Received environment information (input_bootstrap_servers, output_bootstrap_servers, model_url, input_format, input_config, input_topic, output_topic, group_id) ([%s], [%s], [%s], [%s], [%s], [%s], [%s], [%s])", 
               input_bootstrap_servers, output_bootstrap_servers, model_url, input_format, str(input_config), input_topic, output_topic, group_id)
-    
+
     download_model(model_url, MODEL_PATH, RETRIES, SLEEP_BETWEEN_REQUESTS)
     """Downloads the model from the URL received and saves in the filesystem"""
-    
+
     model = load_model(MODEL_PATH)
     """Loads the model from the filesystem to a Tensorflow model"""
-    
+
     model.summary()
     """Prints the model information"""
 
     consumer = Consumer({'bootstrap.servers': input_bootstrap_servers,'group.id': 'group_id','auto.offset.reset': 'earliest','enable.auto.commit': False})
     consumer.subscribe([input_topic])
     """Starts a Kafka consumer to receive the information to predict"""
-    
+
     logging.info("Started Kafka consumer in [%s] topic", input_topic)
 
     output_producer = Producer({'bootstrap.servers': output_bootstrap_servers})
     """Starts a Kafka producer to send the predictions to the output"""
-    
+
     logging.info("Started Kafka producer in [%s] topic", output_topic)
 
     if distributed:
       upper_producer = Producer({'bootstrap.servers': upper_bootstrap_servers})
       """Starts a Kafka producer to send the predictions to upper model"""
-    
+
       logging.info("Started Kafka producer in [%s] topic", output_upper)
 
     decoder = DecoderFactory.get_decoder(input_format, input_config)
@@ -133,8 +131,8 @@ if __name__ == '__main__':
       if msg is None:
           continue
       if msg.error():
-          print("Consumer error: {}".format(msg.error()))
-          continue
+        print(f"Consumer error: {msg.error()}")
+        continue
 
       try:
         start_inference = time.time()
@@ -149,7 +147,7 @@ if __name__ == '__main__':
         else:
           prediction_output = model.predict(input_decoded)
         """Predicts the data received"""
-        
+
         prediction_value = prediction_output.tolist()[0]
         """Gets the prediction value"""
 
@@ -170,17 +168,16 @@ if __name__ == '__main__':
           ## Cada ciertos mensajes, 10 ej. commit.
           if commitedMessages >= MAX_MESSAGES_TO_COMMIT:  
             upper_producer.flush()
-          """Flush the message to be sent now"""
         else:
           output_producer.produce(output_topic, response_to_kafka)
           ## Cada ciertos mensajes, 10 ej. commit.
           if commitedMessages >= MAX_MESSAGES_TO_COMMIT:  
             output_producer.flush()
-          """Flush the message to be sent now"""
+        """Flush the message to be sent now"""
         """Sends the message to Kafka"""
 
         logging.debug("Prediction sent to Kafka")
-        
+
 
         if commitedMessages >= MAX_MESSAGES_TO_COMMIT:          
           consumer.commit()

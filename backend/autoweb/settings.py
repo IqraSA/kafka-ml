@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
+
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -23,7 +24,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'zbtes53q%twx0#&@$c-b2^299qv1fi4v3ldv*&u9po%bbd8asu' if os.environ.get('SECRET_KEY') is None else os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True if os.environ.get('DEBUG') is None or os.environ.get('DEBUG')== '1' else False
+DEBUG = os.environ.get('DEBUG') is None or os.environ.get('DEBUG')== '1'
 
 ALLOWED_HOSTS = ['backend', 'frontend', '127.0.0.1', 'localhost', '[::1]'] if os.environ.get('ALLOWED_HOSTS') is None else os.environ.get('ALLOWED_HOSTS').split(',')
 

@@ -102,7 +102,7 @@ class DeployDeploymentSerializer(serializers.ModelSerializer):
     
     def validate_batch(self, value):
         """Checks that batch size is greater than 0"""
-        
+
         if value <= 0:
             raise serializers.ValidationError("Batch has to be greater than 0")
         return value
@@ -182,8 +182,7 @@ class DeployInferenceSerializer(serializers.ModelSerializer):
 
         result_id = self.initial_data.get("model_result") if "model_result" in self.initial_data else ''
         result = TrainingResult.objects.get(pk=result_id)
-        inference = Inference.objects.create(model_result=result, **validated_data)
-        return inference
+        return Inference.objects.create(model_result=result, **validated_data)
 
 
 class InferenceSerializer(serializers.ModelSerializer):

@@ -46,54 +46,28 @@ class CustomCallback(keras.callbacks.Callback):
     super().__init__()
     self.case = case
     self.tensorflow_models = tensorflow_models
-    if self.case == NOT_DISTRIBUTED_NOT_INCREMENTAL or self.case == NOT_DISTRIBUTED_INCREMENTAL:
+    if self.case in [
+        NOT_DISTRIBUTED_NOT_INCREMENTAL,
+        NOT_DISTRIBUTED_INCREMENTAL,
+    ]:
       self.url = result_url.replace('results', 'results_metrics')
       self.epoch_training_metrics = {}
       self.epoch_validation_metrics = {}
-    elif self.case == DISTRIBUTED_NOT_INCREMENTAL or self.case == DISTRIBUTED_INCREMENTAL:
-      self.url = []
-      for elem in result_url:
-        self.url.append(elem.replace('results', 'results_metrics'))
+    elif self.case in [DISTRIBUTED_NOT_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
+      self.url = [elem.replace('results', 'results_metrics') for elem in result_url]
       self.epoch_training_metrics = []
       self.epoch_validation_metrics = []
-      for i in range(len(self.tensorflow_models)):
+      for _ in range(len(self.tensorflow_models)):
         self.epoch_training_metrics.append({})
         self.epoch_validation_metrics.append({})
 
   def __send_data(self, logs, inc_val):
     finished = False
 
-    if not inc_val:
-      if self.case == NOT_DISTRIBUTED_NOT_INCREMENTAL or self.case == NOT_DISTRIBUTED_INCREMENTAL:
-        for k, v in logs.items():
-          if not k.startswith("val_"):
-            if not k in self.epoch_training_metrics.keys():
-              self.epoch_training_metrics[k] = [v]
-            else:
-              self.epoch_training_metrics[k].append(v)
-          else:
-            if not k[4:] in self.epoch_validation_metrics.keys():
-              self.epoch_validation_metrics[k[4:]] = [v]
-            else:
-              self.epoch_validation_metrics[k[4:]].append(v)
-      elif self.case == DISTRIBUTED_NOT_INCREMENTAL or self.case == DISTRIBUTED_INCREMENTAL:
-        for i, m in zip(range(len(self.tensorflow_models)), self.tensorflow_models):
-          for k, v in logs.items():
-            if m.name in k:
-              if not k.startswith("val_"):
-                if not k[len(m.name)+1:] in self.epoch_training_metrics[i].keys():
-                  self.epoch_training_metrics[i][k[len(m.name)+1:]] = [v]
-                else:
-                  self.epoch_training_metrics[i][k[len(m.name)+1:]].append(v)
-              else:
-                if not k[4+len(m.name)+1:] in self.epoch_validation_metrics[i].keys():
-                  self.epoch_validation_metrics[i][k[4+len(m.name)+1:]] = [v]
-                else:
-                  self.epoch_validation_metrics[i][k[4+len(m.name)+1:]].append(v)
-    else:
+    if inc_val:
       if self.case == NOT_DISTRIBUTED_INCREMENTAL:
         for k, v in logs.items():
-          if not k in self.epoch_validation_metrics.keys():
+          if k not in self.epoch_validation_metrics.keys():
             self.epoch_validation_metrics[k] = [v]
           else:
             self.epoch_validation_metrics[k].append(v)
@@ -101,17 +75,49 @@ class CustomCallback(keras.callbacks.Callback):
         for i, m in zip(range(len(self.tensorflow_models)), self.tensorflow_models):
           for k, v in logs.items():
             if m.name in k:
-              if not k[len(m.name)+1:] in self.epoch_validation_metrics[i].keys():
+              if (k[len(m.name) +
+                    1:] not in self.epoch_validation_metrics[i].keys()):
                 self.epoch_validation_metrics[i][k[len(m.name)+1:]] = [v]
               else:
                 self.epoch_validation_metrics[i][k[len(m.name)+1:]].append(v)
-    
-    if self.case == NOT_DISTRIBUTED_NOT_INCREMENTAL or self.case == NOT_DISTRIBUTED_INCREMENTAL:
+
+    elif self.case in [
+          NOT_DISTRIBUTED_NOT_INCREMENTAL,
+          NOT_DISTRIBUTED_INCREMENTAL,
+      ]:
+      for k, v in logs.items():
+        if k.startswith("val_"):
+          if k[4:] not in self.epoch_validation_metrics.keys():
+            self.epoch_validation_metrics[k[4:]] = [v]
+          else:
+            self.epoch_validation_metrics[k[4:]].append(v)
+        elif k not in self.epoch_training_metrics.keys():
+          self.epoch_training_metrics[k] = [v]
+        else:
+          self.epoch_training_metrics[k].append(v)
+    elif self.case in [DISTRIBUTED_NOT_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
+      for i, m in zip(range(len(self.tensorflow_models)), self.tensorflow_models):
+        for k, v in logs.items():
+          if m.name in k:
+            if k.startswith("val_"):
+              if (k[4 + len(m.name) +
+                    1:] not in self.epoch_validation_metrics[i].keys()):
+                self.epoch_validation_metrics[i][k[4+len(m.name)+1:]] = [v]
+              else:
+                self.epoch_validation_metrics[i][k[4+len(m.name)+1:]].append(v)
+            elif k[len(m.name) + 1:] not in self.epoch_training_metrics[i].keys():
+              self.epoch_training_metrics[i][k[len(m.name)+1:]] = [v]
+            else:
+              self.epoch_training_metrics[i][k[len(m.name)+1:]].append(v)
+    if self.case in [
+        NOT_DISTRIBUTED_NOT_INCREMENTAL,
+        NOT_DISTRIBUTED_INCREMENTAL,
+    ]:
       results = {
                 'train_metrics': self.epoch_training_metrics,
                 'val_metrics': self.epoch_validation_metrics
       }
-    elif self.case == DISTRIBUTED_NOT_INCREMENTAL or self.case == DISTRIBUTED_INCREMENTAL:
+    elif self.case in [DISTRIBUTED_NOT_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
       results_list = []
       for i in range(len(self.tensorflow_models)):
         results = {
@@ -123,7 +129,10 @@ class CustomCallback(keras.callbacks.Callback):
     retry = 0
     while not finished and retry < RETRIES:
       try:
-        if self.case == NOT_DISTRIBUTED_NOT_INCREMENTAL or self.case == NOT_DISTRIBUTED_INCREMENTAL:
+        if self.case in [
+            NOT_DISTRIBUTED_NOT_INCREMENTAL,
+            NOT_DISTRIBUTED_INCREMENTAL,
+        ]:
           data = {'data': json.dumps(results)}
           r = requests.post(self.url, data=data)
           if r.status_code == 200:
@@ -132,7 +141,7 @@ class CustomCallback(keras.callbacks.Callback):
           else:
             time.sleep(SLEEP_BETWEEN_REQUESTS)
             retry += 1
-        elif self.case == DISTRIBUTED_NOT_INCREMENTAL or self.case == DISTRIBUTED_INCREMENTAL:
+        elif self.case in [DISTRIBUTED_NOT_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
           responses = []
           for (result, url) in zip(results_list, self.url):
             data = {'data': json.dumps(result)}
@@ -151,11 +160,11 @@ class CustomCallback(keras.callbacks.Callback):
         time.sleep(SLEEP_BETWEEN_REQUESTS)
 
   def on_epoch_end(self, epoch, logs=None):
-    logging.info("Updating training metrics from epoch {}".format(epoch))
+    logging.info(f"Updating training metrics from epoch {epoch}")
     self.__send_data(logs, False)
 
   def on_test_end(self, logs=None):
-    if self.case == NOT_DISTRIBUTED_INCREMENTAL or self.case == DISTRIBUTED_INCREMENTAL:
+    if self.case in [NOT_DISTRIBUTED_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
       logging.info("Updating validation metrics")
       self.__send_data(logs, True)
 
@@ -166,14 +175,14 @@ def select_gpu():
   try:
     _output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
     memory_free_info = _output_to_list(sp.check_output(COMMAND.split()))[1:]
-    memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-    
+    memory_free_values = [int(x.split()[0]) for x in memory_free_info]
+
     available_gpus = [i for i, x in enumerate(memory_free_values) if x > ACCEPTABLE_AVAILABLE_MEMORY]
     print("Available GPUs:", available_gpus)
     if len(available_gpus) > 1:
         available_gpus = [memory_free_values.index(max(memory_free_values))]
         print("Using GPU:", available_gpus)
-        
+
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, available_gpus))
   except Exception as e:
     print('"nvidia-smi" is probably not installed. GPUs are not masked.', e)
@@ -206,7 +215,7 @@ def load_environment_vars(case):
   kwargs_val = json.loads(os.environ.get('KWARGS_VAL').replace("'", '"'))
   confussion_matrix = json.loads(os.environ.get('CONF_MAT_CONFIG').replace("'", '"'))
 
-  if case == DISTRIBUTED_NOT_INCREMENTAL or case == DISTRIBUTED_INCREMENTAL:
+  if case in [DISTRIBUTED_NOT_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
     result_url = eval(result_url)
     result_id = eval(result_id)
     N = len(result_id)
@@ -214,8 +223,8 @@ def load_environment_vars(case):
     learning_rate = eval(os.environ.get('LEARNING_RATE'))
     loss = os.environ.get('LOSS')
     metrics = os.environ.get('METRICS')
-  
-  if case == NOT_DISTRIBUTED_INCREMENTAL or case == DISTRIBUTED_INCREMENTAL:
+
+  if case in [NOT_DISTRIBUTED_INCREMENTAL, DISTRIBUTED_INCREMENTAL]:
     stream_timeout = int(os.environ.get('STREAM_TIMEOUT'))
     message_poll_timeout = int(os.environ.get('MESSAGE_POLL_TIMEOUT'))
     monitoring_metric = os.environ.get('MONITORING_METRIC')
@@ -246,9 +255,13 @@ def get_train_data(boostrap_servers, kafka_topic, group, decoder):
       train_kafka: training data and labels from Kafka
   """
   logging.info("Starts receiving training data from Kafka servers [%s] with topics [%s]", boostrap_servers,  kafka_topic)
-  train_data = kafka_io.KafkaDataset(kafka_topic.split(','), servers=boostrap_servers, group=group, eof=True, message_key=True).map(lambda x, y: decoder.decode(x, y))
-  
-  return train_data
+  return kafka_io.KafkaDataset(
+      kafka_topic.split(','),
+      servers=boostrap_servers,
+      group=group,
+      eof=True,
+      message_key=True,
+  ).map(lambda x, y: decoder.decode(x, y))
 
 def get_online_train_data(boostrap_servers, kafka_topic, group, stream_timeout, message_poll_timeout):
   """Obtains the data and labels incrementally for training from Kafka
@@ -264,18 +277,16 @@ def get_online_train_data(boostrap_servers, kafka_topic, group, stream_timeout, 
       online_train_kafka: online training data and labels from Kafka
   """
   logging.info("Starts receiving online training data from Kafka servers [%s] with topics [%s], group [%s], stream_timeout [%d] and message_poll_timeout [%d]", boostrap_servers,  kafka_topic, group, stream_timeout, message_poll_timeout)
-  
-  online_train_data = tfio.experimental.streaming.KafkaBatchIODataset(
-    topics=[kafka_topic],
-    group_id=group,
-    servers=boostrap_servers,
-    stream_timeout=stream_timeout,
-    message_poll_timeout=message_poll_timeout,
-    configuration=None,
-    internal=True
+
+  return tfio.experimental.streaming.KafkaBatchIODataset(
+      topics=[kafka_topic],
+      group_id=group,
+      servers=boostrap_servers,
+      stream_timeout=stream_timeout,
+      message_poll_timeout=message_poll_timeout,
+      configuration=None,
+      internal=True,
   )
-  
-  return online_train_data
 
 if __name__ == '__main__':
   try:
